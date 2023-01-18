@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+
+    <head>
+        <meta charset="UTF-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Kijiji Web Scraper</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet"
+            integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+        <style>
+            table {
+                border: 5px solid black;
+            }
+
+            tr {
+                border: 1px solid black;
+            }
+        </style>
+    </head>
+
+    <body>
+        <div class="col-12 text-center">
+            <h1 class="display-1">Kijiji Web Scraper</h1>
+            <div class="">
+                <form id="form" action="" autocomplete="off">
+                    <p>Enter Category Number (Default 0 for all categories)</p>
+                    <input type="text" id="category">
+                    <br>
+                    <br>
+                    <p>Enter Location Number (Default 0 for all of Canada)</p>
+                    <input type="text" id="location">
+                    <br>
+                    <br>
+                    <p>Minimum Number of Results (Default 1)</p>
+                    <input type="text" id="min">
+                    <br>
+                    <br>
+                    <p>keywords</p>
+                    <input type="text" id="keywords">
+                    <br>
+                    <br>
+                    <input type="submit" autocomplete="false" value="Scrape">
+                </form>
+                <br>
+                <p>Results may take up to a few minutes</p>
+                <br>
+                <p id="status"></p>
+                <br>
+
+                <table id="ads" class="visually-hidden d-flex justify-content-center">
+                    <tr>
+                        <th>Title</th>
+                        <th>URL</th>
+                        <th>Location</th>
+                        <th>Description</th>
+                        <th>Price</th>
+                    <tr>
+                </table>
+            </div>
+        </div>
+
+        <script src="/socket.io/socket.io.js"></script>
+        <script>
+            function hi(n) {
+                alert("Hi,", n)
+            }
+            window.onload = function () {
+                var socket = io();
+                var form = document.getElementById('form');
+                var category = document.getElementById('category');
+                var location = document.getElementById('location');
+                var min = document.getElementById("min");
+                var keywords = document.getElementById("keywords");
+                var adsList = document.getElementById("ads");
+                var status = document.getElementById("status");
+
+                form.addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    adsList.classList.remove("visually-hidden")
+                    adsList.innerHTML =
+                        "<tr><th>Title</th><th>URL</th><th>Location</th><th>Description</th><th>Price</th><tr>"
+                    status.innerHTML = "Loading..."
+                    if (!location.value) {
+                        location.value = 0
+                    }
+                    if (!category.value) {
+                        category.value = 0
+                    }
+                    if (!min.value) {
+                        min.value = 1
+                    }
+
+
+                    socket.emit('search', category.value, location.value, min.value, keywords.value)
+                });
+
+                socket.on('search results', function (info) {
+                    console.log("\n\n\nSTATUS IS", status);
+                    for (let i = 0; i < info.ads.length; i++) {
+                        var row = adsList.insertRow(-1)
+                        var titleCell = row.insertCell(0);
+                        var urlCell = row.insertCell(1);
+                        var locationCell = row.insertCell(2);
+                        var descCell = row.insertCell(3);
+                        var priceCell = row.insertCell(4);
+
+                        titleCell.innerHTML = info.ads[i].title;
+                        urlCell.innerHTML = info.ads[i].url;
+                        locationCell.innerHTML = info.ads[i].attributes.location;
+                        descCell.innerHTML = info.ads[i].description;
+                        priceCell.innerHTML = info.ads[i].attributes.price;
+                    }
+                    if (info.ads.length > 0) {
+                        console.log(info.ads[0].attributes)
+                        status.innerHTML = "Done"
+                    } else if (info.ads.length == 0 && info.status != 'error') {
+                        status.innerHTML = "<p class = 'text-danger'>No Results Found</p>"
+                    } else if (info.status == 'error') {
+                        status.innerHTML =
+                            "<p class = 'text-warning'>Please use a specfic category for this keyword (not 0)</p>"
+                    }
+                });
+
+                socket.on('new topic', function (topic) {
+
+                });
+            }
+            // Taken from https://www.w3schools.com/howto/howto_js_sort_table.asp
+            function sortTable(n) {
+                var table, rows, switching, i, x, y, shouldSwitch, dir, switchcount = 0;
+                table = document.getElementById("ads");
+                switching = true;
+                // Set the sorting direction to ascending:
+                dir = "asc";
+                /* Make a loop that will continue until
+                no switching has been done: */
+                while (switching) {
+                    // Start by saying: no switching is done:
+                    switching = false;
+                    rows = table.rows;
+                    /* Loop through all table rows (except the
+                    first, which contains table headers): */
+                    for (i = 1; i < (rows.length - 1); i++) {
+                        // Start by saying there should be no switching:
+                        shouldSwitch = false;
+                        /* Get the two elements you want to compare,
+                        one from current row and one from the next: */
+                        x = rows[i].getElementsByTagName("TD")[n];
+                        y = rows[i + 1].getElementsByTagName("TD")[n];
+                        /* Check if the two rows should switch place,
+                        based on the direction, asc or desc: */
+                        if (dir == "asc") {
+                            if (x.innerHTML.toLowerCase() > y.innerHTML.toLowerCase()) {
+                                // If so, mark as a switch and break the loop:
+                                shouldSwitch = true;
+                                break;
+                            }
+                        } else if (dir == "desc") {
+                            if (x.innerHTML.toLowerCase() < y.innerHTML.toLowerCase()) {
+                                // If so, mark as a switch and break the loop:
+                                shouldSwitch = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (shouldSwitch) {
+                        /* If a switch has been marked, make the switch
+                        and mark that a switch has been done: */
+                        rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                        switching = true;
+                        // Each time a switch is done, increase this count by 1:
+                        switchcount++;
+                    } else {
+                        /* If no switching has been done AND the direction is "asc",
+                        set the direction to "desc" and run the while loop again. */
+                        if (switchcount == 0 && dir == "asc") {
+                            dir = "desc";
+                            switching = true;
+                        }
+                    }
+                }
+            }
+        </script>
+    </body>
